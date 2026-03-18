@@ -1,0 +1,165 @@
+{
+  "project_name": "BoneFractureAI_Dashboard",
+  "design_philosophy": {
+    "identity": "The Anti-AI Medical Studio",
+    "core_principles": [
+      "Clinical Precision over Decoration",
+      "Dark Mode First (Radiology Standard)",
+      "Data as Art",
+      "Invisible Tech"
+    ],
+    "theme_strategy": "Radiology Dark",
+    "emotional_goal": "Trust, Focus, Speed"
+  },
+  "typography": {
+    "headings": {
+      "family": "Plus Jakarta Sans, sans-serif",
+      "weights": ["600", "700"],
+      "usage": "Use for all page titles, card headers, and major section labels.",
+      "letter_spacing": "tracking-tight"
+    },
+    "body": {
+      "family": "DM Sans, sans-serif",
+      "weights": ["400", "500"],
+      "usage": "Standard text, descriptions, and instructions.",
+      "letter_spacing": "tracking-normal"
+    },
+    "mono": {
+      "family": "JetBrains Mono, monospace",
+      "weights": ["400"],
+      "usage": "Patient IDs, Confidence Scores, Coordinates, Dates.",
+      "letter_spacing": "tracking-wide"
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "#09090b",
+      "surface": "#18181b",
+      "surface_highlight": "#27272a",
+      "border": "#27272a",
+      "text_primary": "#fafafa",
+      "text_secondary": "#a1a1aa",
+      "text_tertiary": "#52525b",
+      "primary": "#3b82f6",
+      "primary_glow": "rgba(59, 130, 246, 0.5)",
+      "success": "#10b981",
+      "warning": "#f59e0b",
+      "danger": "#ef4444",
+      "medical_teal": "#2dd4bf"
+    },
+    "usage_rules": {
+      "background": "Use pure #09090b for the main app background to reduce glare.",
+      "cards": "Use #18181b with a 1px border of #27272a. NO SHADOWS in dark mode, use borders.",
+      "accents": "Use 'Electric Blue' (#3b82f6) for primary actions. Use 'Danger Red' (#ef4444) ONLY for 'Fracture Detected' states.",
+      "gradients": "Avoid large gradients. Use subtle radial glows behind key elements (like the X-ray viewer)."
+    }
+  },
+  "layout_strategy": {
+    "grid_system": "The Bento Grid (Mode B - High Density)",
+    "spacing": {
+      "base": "Relaxed but precise. Use p-6 or p-8 for containers, but gap-4 for dense data grids.",
+      "containers": "All containers with borders MUST have p-6 internal padding."
+    },
+    "sections": {
+      "landing": {
+        "style": "The Scanner",
+        "description": "Immersive dark hero. Center: A 3D or animated 2D bone being 'scanned'. Typography: Large, tracking-tighter."
+      },
+      "dashboard": {
+        "style": "Cockpit View",
+        "description": "Sidebar navigation (collapsed by default on mobile). Main area: Dense grid of stats. Right panel: Recent activity."
+      },
+      "prediction_view": {
+        "style": "Theater Mode",
+        "structure": [
+          "Left Sidebar: Patient Metadata (Collapsible)",
+          "Center Stage: X-Ray Viewer (Maximized height)",
+          "Right Panel: AI Analysis & Controls (Floating or Fixed)"
+        ]
+      }
+    }
+  },
+  "components": {
+    "library": "shadcn/ui",
+    "custom_components": [
+      {
+        "name": "XrayViewer",
+        "description": "A specialized image viewer with Zoom/Pan capabilities. MUST support overlaying a semi-transparent Heatmap (Grad-CAM).",
+        "features": ["Zoom", "Pan", "Brightness/Contrast toggle", "Heatmap Opacity Slider"]
+      },
+      {
+        "name": "ConfidenceGauge",
+        "description": "A semi-circle or linear gauge showing the probability of fracture. Color transitions from Green (Normal) to Red (Fracture)."
+      },
+      {
+        "name": "StatusBadge",
+        "description": "Pill-shaped badge with 'dot' indicator. Green dot = Normal, Red pulse dot = Fracture."
+      }
+    ],
+    "styling_overrides": {
+      "radius": "rounded-md (Keep it technical, not too round)",
+      "borders": "1px solid border-border",
+      "shadows": "none (in dark mode)"
+    }
+  },
+  "visual_enhancers": {
+    "scanlines": {
+      "css": "background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.2) 3px); pointer-events: none;",
+      "usage": "Overlay on the X-ray image to give a 'monitor' feel."
+    },
+    "tech_corners": {
+      "description": "SVG brackets absolute positioned at the corners of the X-ray viewer container.",
+      "color": "text-primary/50"
+    },
+    "glassmorphism": {
+      "usage": "Use only for floating toolbars on top of the X-ray image.",
+      "classes": "bg-black/60 backdrop-blur-md border border-white/10"
+    }
+  },
+  "motion": {
+    "library": "framer-motion",
+    "interactions": [
+      {
+        "name": "Scan Effect",
+        "description": "A horizontal line moving up and down across the X-ray image during 'Processing' state.",
+        "duration": "2s loop"
+      },
+      {
+        "name": "Panel Slide",
+        "description": "Sidebars should slide in from off-screen (AnimatePresence)."
+      }
+    ]
+  },
+  "assets": {
+    "icons": {
+      "library": "@phosphor-icons/react",
+      "style": "duotone or regular",
+      "set": ["Bone", "Warning", "CheckCircle", "Upload", "MagnifyingGlass", "User", "Activity", "FileText", "Gear"]
+    },
+    "images": {
+      "hero_bg": "Abstract dark mesh or subtle grid.",
+      "placeholders": [
+        "https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&q=80"
+      ]
+    }
+  },
+  "accessibility": {
+    "contrast": "Ensure text is APCA compliant. Pure white text on #09090b is safe.",
+    "color_blindness": "Do not rely on Red/Green alone. Use Icons (Check vs Alert) and Text Labels alongside colors."
+  },
+  "universal_guidelines": [
+    "Do not use gradients for main backgrounds.",
+    "Use 'sonner' for all toast notifications.",
+    "Inputs and Buttons must have a 'data-testid' attribute.",
+    "All API calls must be mocked if backend is not ready.",
+    "Ensure the X-ray viewer handles different aspect ratios without distortion (object-contain)."
+  ],
+  "instructions_to_main_agent": [
+    "1. Setup Shadcn UI with the 'slate' or 'zinc' base color.",
+    "2. Install @phosphor-icons/react and framer-motion.",
+    "3. Create the 'XrayViewer' component early - it's the core feature.",
+    "4. Implement the 'Scan Effect' animation for the loading state of the prediction.",
+    "5. Use the 'Radiology Dark' theme variables in tailwind.config.js."
+  ]
+}
