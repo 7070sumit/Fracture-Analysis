@@ -74,7 +74,7 @@ class FractureDataset(Dataset):
         return image, label
 
 class ModelManager:
-    def __init__(self, model_dir="/app/backend/models", data_dir="/app/backend/data"):
+    def __init__(self, model_dir="models", data_dir="data"):
         self.model_dir = Path(model_dir)
         self.data_dir = Path(data_dir)
         self.model_dir.mkdir(exist_ok=True)
