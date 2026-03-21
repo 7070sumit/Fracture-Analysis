@@ -39,27 +39,51 @@ class BoneFractureModel(nn.Module):
 class FractureDataset(Dataset):
     def __init__(self, data_dir: str, split: str = "train", transform=None):
         self.data_dir = Path(data_dir)
-        self.split_dir = self.data_dir / split
+        # MURA uses 'valid' instead of 'val'
+        self.split_name = "valid" if split == "val" else split
+        self.split_dir = self.data_dir / self.split_name
         self.transform = transform
         
         self.images = []
         self.labels = []
         
-        # Load normal images
-        normal_dir = self.split_dir / "normal"
-        if normal_dir.exists():
-            for img_path in normal_dir.glob("*"):
-                if img_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
-                    self.images.append(str(img_path))
-                    self.labels.append(0)
+        csv_path = self.data_dir / f"{self.split_name}_image_paths.csv"
         
-        # Load fractured images
-        fractured_dir = self.split_dir / "fractured"
-        if fractured_dir.exists():
-            for img_path in fractured_dir.glob("*"):
-                if img_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
-                    self.images.append(str(img_path))
-                    self.labels.append(1)
+        if csv_path.exists():
+            # MURA Dataset parsing
+            with open(csv_path, 'r') as f:
+                for line in f:
+                    img_path_str = line.strip()
+                    if not img_path_str: continue
+                    
+                    # paths in MURA csv start with "MURA-v1.1/", e.g., MURA-v1.1/train/XR_SHOULDER/...
+                    if self.data_dir.name == "MURA-v1.1":
+                        full_path = self.data_dir.parent / img_path_str
+                    else:
+                        full_path = self.data_dir / img_path_str.split("MURA-v1.1/")[-1]
+                        
+                    if full_path.exists():
+                        self.images.append(str(full_path))
+                        # "positive" means abnormal/fracture (1), "negative" means normal (0)
+                        label = 1 if 'positive' in str(full_path) else 0
+                        self.labels.append(label)
+        else:
+            # Handle standard custom dataset structure
+            # Load normal images
+            normal_dir = self.split_dir / "normal"
+            if normal_dir.exists():
+                for img_path in normal_dir.glob("*"):
+                    if img_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+                        self.images.append(str(img_path))
+                        self.labels.append(0)
+            
+            # Load fractured images
+            fractured_dir = self.split_dir / "fractured"
+            if fractured_dir.exists():
+                for img_path in fractured_dir.glob("*"):
+                    if img_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+                        self.images.append(str(img_path))
+                        self.labels.append(1)
     
     def __len__(self):
         return len(self.images)
@@ -74,12 +98,18 @@ class FractureDataset(Dataset):
         return image, label
 
 class ModelManager:
-    def __init__(self, model_dir="/app/backend/models", data_dir="/app/backend/data"):
-        self.model_dir = Path(model_dir)
-        self.data_dir = Path(data_dir)
-        self.model_dir.mkdir(exist_ok=True)
+    def __init__(self, model_dir=None, data_dir=None):
+        base_dir = Path(__file__).parent
+        self.model_dir = Path(model_dir) if model_dir else base_dir / "models"
+        self.data_dir = Path(data_dir) if data_dir else base_dir / "data"
+        self.model_dir.mkdir(parents=True, exist_ok=True)
         
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
         logger.info(f"Using device: {self.device}")
         
         self.model = BoneFractureModel(num_classes=2).to(self.device)
@@ -219,12 +249,15 @@ class ModelManager:
             if training_state:
                 training_state["status"] = "training"
             
+            import time
             for epoch in range(epochs):
                 # Training phase
                 self.model.train()
                 train_loss = 0
+                total_batches = len(train_loader)
                 
                 for batch_idx, (images, labels) in enumerate(train_loader):
+                    batch_start_time = time.time()
                     images, labels = images.to(self.device), labels.to(self.device)
                     
                     optimizer.zero_grad()
@@ -234,8 +267,13 @@ class ModelManager:
                     optimizer.step()
                     
                     train_loss += loss.item()
+                    
+                    if (batch_idx + 1) % 50 == 0:
+                        batch_time = time.time() - batch_start_time
+                        eta_epoch_mins = (total_batches - (batch_idx + 1)) * batch_time / 60
+                        logger.info(f"Epoch [{epoch+1}/{epochs}], Step [{batch_idx+1}/{total_batches}], Loss: {loss.item():.4f}, ETA for epoch: {eta_epoch_mins:.1f}m")
                 
-                train_loss /= len(train_loader)
+                train_loss /= total_batches
                 history['train_loss'].append(train_loss)
                 
                 # Validation phase
