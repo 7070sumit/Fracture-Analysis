@@ -27,7 +27,7 @@ class GradCAM:
         self.target_layer.register_forward_hook(forward_hook)
         self.target_layer.register_full_backward_hook(backward_hook)
     
-    def generate(self, input_tensor: torch.Tensor, class_idx: int) -> np.ndarray:
+    def generate(self, input_tensor: torch.Tensor, class_idx: int, clinical_tensor: torch.Tensor = None) -> np.ndarray:
         """
         Generate Grad-CAM heatmap
         Args:
@@ -39,7 +39,7 @@ class GradCAM:
         self.model.eval()
         
         # Forward pass
-        output = self.model(input_tensor)
+        output = self.model(input_tensor, clinical_tensor)
         
         # Backward pass
         self.model.zero_grad()
@@ -75,13 +75,13 @@ class GradCAM:
         overlay = cv2.addWeighted(image, 1-alpha, heatmap_colored, alpha, 0)
         return overlay
 
-def create_grad_cam_visualization(model, grad_cam, image_tensor, original_image, class_idx):
+def create_grad_cam_visualization(model, grad_cam, image_tensor, original_image, class_idx, clinical_tensor=None):
     """
     Create Grad-CAM visualization and return as base64 encoded image
     """
     try:
         # Generate Grad-CAM
-        cam = grad_cam.generate(image_tensor, class_idx)
+        cam = grad_cam.generate(image_tensor, class_idx, clinical_tensor)
         
         # Convert original image to numpy
         image_np = np.array(original_image.resize((224, 224)))

@@ -9,7 +9,7 @@ logging.basicConfig(
 logger = logging.getLogger("train_script")
 
 if __name__ == "__main__":
-    MURA_DATA_DIR = "/Users/piyushkumar/Project/Fracture-Analysis-main/datasets/MURA/muramskxrays/MURA-v1.1"
+    MURA_DATA_DIR = "/Users/piyushkumar/Project/Fracture-Analysis-main/backend/datasets/MURA/muramskxrays/MURA-v1.1"
     
     logger.info(f"Initializing ModelManager with MURA dataset at {MURA_DATA_DIR}")
     
