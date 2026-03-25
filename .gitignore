@@ -79,3 +79,9 @@ agenthub/agents/youtube/db
 # Mobile development
 android-sdk/ frontend/node_modules/.cache/default-development/2.pack
 frontend/node_modules/.cache/default-development/2.pack
+
+# Project specific ignores
+backend/models/
+backend/datasets/
+backend/server.log
+frontend/package-lock.json
