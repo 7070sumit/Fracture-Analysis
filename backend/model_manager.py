@@ -9,6 +9,7 @@ import json
 import logging
 from typing import Dict, Optional, List
 import os
+import hashlib
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 import base64
 from io import BytesIO
@@ -19,22 +20,57 @@ from grad_cam import GradCAM, create_grad_cam_visualization
 logger = logging.getLogger(__name__)
 
 class BoneFractureModel(nn.Module):
-    def __init__(self, num_classes=2):
+    def __init__(self, num_classes=2, num_clinical_features=5):
         super().__init__()
         # Use ResNet50 with pretrained weights
         self.backbone = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
         in_features = self.backbone.fc.in_features
         
-        # Replace final layer
-        self.backbone.fc = nn.Sequential(
-            nn.Linear(in_features, 512),
+        # Remove final classification layer from backbone
+        self.backbone.fc = nn.Identity()
+        
+        # Multilayer Perceptron for Clinical features
+        self.clinical_mlp = nn.Sequential(
+            nn.Linear(num_clinical_features, 64),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.2),
+            nn.Linear(64, 128),
+            nn.ReLU(inplace=True)
+        )
+        
+        combined_dim = in_features + 128
+        
+        # Attention over combined features
+        self.attention = nn.Sequential(
+            nn.Linear(combined_dim, 256),
+            nn.Tanh(),
+            nn.Linear(256, combined_dim),
+            nn.Sigmoid()
+        )
+        
+        # Final classifier
+        self.classifier = nn.Sequential(
+            nn.Linear(combined_dim, 512),
             nn.ReLU(inplace=True),
             nn.Dropout(0.5),
             nn.Linear(512, num_classes)
         )
     
-    def forward(self, x):
-        return self.backbone(x)
+    def forward(self, img, clinical=None):
+        img_features = self.backbone(img)
+        
+        if clinical is None:
+            # Provide dummy features if none passed
+            clinical = torch.zeros(img.size(0), 5, device=img.device)
+            
+        clinical_features = self.clinical_mlp(clinical)
+        
+        combined = torch.cat((img_features, clinical_features), dim=1)
+        
+        attn_weights = self.attention(combined)
+        attended_features = combined * attn_weights
+        
+        return self.classifier(attended_features)
 
 class FractureDataset(Dataset):
     def __init__(self, data_dir: str, split: str = "train", transform=None):
@@ -89,13 +125,21 @@ class FractureDataset(Dataset):
         return len(self.images)
     
     def __getitem__(self, idx):
-        image = Image.open(self.images[idx]).convert('RGB')
+        image_path = self.images[idx]
+        image = Image.open(image_path).convert('RGB')
         label = self.labels[idx]
         
         if self.transform:
             image = self.transform(image)
+            
+        # Generate dummy deterministic clinical features based on image path
+        # Using MD5 to create a random seed out of the filepath
+        path_hash = int(hashlib.md5(image_path.encode()).hexdigest(), 16)
+        # Using numpy random state for consistency
+        rng = np.random.RandomState(path_hash % (2**32))
+        clinical_features = torch.tensor(rng.normal(0, 1, 5), dtype=torch.float32)
         
-        return image, label
+        return (image, clinical_features), label
 
 class ModelManager:
     def __init__(self, model_dir=None, data_dir=None):
@@ -147,7 +191,7 @@ class ModelManager:
         else:
             logger.warning("No trained model found. Please train a model first.")
     
-    def predict(self, image_path: str, return_cam: bool = True) -> Dict:
+    def predict(self, image_path: str, return_cam: bool = True, clinical_features: Optional[List[float]] = None) -> Dict:
         """Make prediction on a single image"""
         if self.grad_cam is None:
             # Create a simple prediction without trained model
@@ -163,10 +207,15 @@ class ModelManager:
         image = Image.open(image_path).convert('RGB')
         image_tensor = self.transform(image).unsqueeze(0).to(self.device)
         
+        if clinical_features is not None:
+            clin_tensor = torch.tensor([clinical_features], dtype=torch.float32).to(self.device)
+        else:
+            clin_tensor = None
+        
         # Inference
         self.model.eval()
         with torch.no_grad():
-            logits = self.model(image_tensor)
+            logits = self.model(image_tensor, clin_tensor)
             probs = torch.softmax(logits, dim=1)
         
         confidence, class_idx = probs.max(dim=1)
@@ -188,7 +237,8 @@ class ModelManager:
                     self.grad_cam, 
                     image_tensor, 
                     image, 
-                    class_idx
+                    class_idx,
+                    clin_tensor
                 )
                 result['grad_cam_image'] = grad_cam_img
             except Exception as e:
@@ -256,12 +306,12 @@ class ModelManager:
                 train_loss = 0
                 total_batches = len(train_loader)
                 
-                for batch_idx, (images, labels) in enumerate(train_loader):
+                for batch_idx, ((images, clinical), labels) in enumerate(train_loader):
                     batch_start_time = time.time()
-                    images, labels = images.to(self.device), labels.to(self.device)
+                    images, clinical, labels = images.to(self.device), clinical.to(self.device), labels.to(self.device)
                     
                     optimizer.zero_grad()
-                    outputs = self.model(images)
+                    outputs = self.model(images, clinical)
                     loss = criterion(outputs, labels)
                     loss.backward()
                     optimizer.step()
@@ -281,9 +331,9 @@ class ModelManager:
                 correct = total = 0
                 
                 with torch.no_grad():
-                    for images, labels in val_loader:
-                        images, labels = images.to(self.device), labels.to(self.device)
-                        outputs = self.model(images)
+                    for (images, clinical), labels in val_loader:
+                        images, clinical, labels = images.to(self.device), clinical.to(self.device), labels.to(self.device)
+                        outputs = self.model(images, clinical)
                         _, predicted = torch.max(outputs, 1)
                         total += labels.size(0)
                         correct += (predicted == labels).sum().item()
@@ -358,9 +408,9 @@ class ModelManager:
         all_labels = []
         
         with torch.no_grad():
-            for images, labels in val_loader:
-                images = images.to(self.device)
-                outputs = self.model(images)
+            for (images, clinical), labels in val_loader:
+                images, clinical = images.to(self.device), clinical.to(self.device)
+                outputs = self.model(images, clinical)
                 _, predicted = torch.max(outputs, 1)
                 all_preds.extend(predicted.cpu().numpy())
                 all_labels.extend(labels.numpy())
