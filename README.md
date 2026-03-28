@@ -250,6 +250,16 @@ pm2 logs
 
 # 🧠 8. Training the Model
 
+## Local Script Execution (Recommended for Custom Datasets)
+
+You can directly run the training script from the backend directory to monitor logs in the terminal:
+
+```bash
+cd backend
+source venv/bin/activate
+python run_training.py
+```
+
 ## API Call
 
 ```bash
