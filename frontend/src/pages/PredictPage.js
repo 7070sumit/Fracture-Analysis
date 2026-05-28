@@ -85,9 +85,9 @@ const PredictPage = () => {
               </div>
               <div>
                 <h1 className="text-xl font-heading font-bold tracking-tight" data-testid="page-title">
-                  Fracture Detection
+                  Fracture Risk Prediction
                 </h1>
-                <p className="text-xs text-[#a1a1aa] font-mono">Upload & Analyze</p>
+                <p className="text-xs text-[#a1a1aa] font-mono">Multimodal AI Risk Assessment</p>
               </div>
             </div>
           </div>
@@ -164,10 +164,10 @@ const PredictPage = () => {
                 {isProcessing ? (
                   <>
                     <div className="animate-spin mr-2 h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-                    Analyzing...
+                    Assessing Risk...
                   </>
                 ) : (
-                  'Analyze X-ray'
+                  'Assess Fracture Risk'
                 )}
               </Button>
             )}
@@ -183,7 +183,7 @@ const PredictPage = () => {
               >
                 {/* Status Badge */}
                 <div className="bg-[#18181b] border border-[#27272a] rounded-md p-6">
-                  <h3 className="text-sm text-[#a1a1aa] font-mono mb-4">DIAGNOSIS</h3>
+                  <h3 className="text-sm text-[#a1a1aa] font-mono mb-4">RISK ASSESSMENT</h3>
                   <div className="flex justify-center mb-6">
                     <StatusBadge prediction={result.prediction} confidence={result.confidence} />
                   </div>
@@ -192,11 +192,11 @@ const PredictPage = () => {
 
                 {/* Probabilities */}
                 <div className="bg-[#18181b] border border-[#27272a] rounded-md p-6">
-                  <h3 className="text-sm text-[#a1a1aa] font-mono mb-4">CLASS PROBABILITIES</h3>
+                  <h3 className="text-sm text-[#a1a1aa] font-mono mb-4">RISK PROBABILITY BREAKDOWN</h3>
                   <div className="space-y-4">
                     <div>
                       <div className="flex justify-between text-sm mb-2">
-                        <span className="font-body text-[#fafafa]">Normal</span>
+                        <span className="font-body text-[#fafafa]">Low Risk (Normal)</span>
                         <span className="font-mono text-[#10b981]" data-testid="normal-probability">
                           {(result.probabilities[0] * 100).toFixed(2)}%
                         </span>
@@ -205,7 +205,7 @@ const PredictPage = () => {
                     </div>
                     <div>
                       <div className="flex justify-between text-sm mb-2">
-                        <span className="font-body text-[#fafafa]">Fracture</span>
+                        <span className="font-body text-[#fafafa]">High Risk (Fracture)</span>
                         <span className="font-mono text-[#ef4444]" data-testid="fracture-probability">
                           {(result.probabilities[1] * 100).toFixed(2)}%
                         </span>
@@ -219,12 +219,23 @@ const PredictPage = () => {
                 <div className="bg-[#18181b] border border-[#27272a] rounded-md p-6">
                   <div className="flex items-start gap-3">
                     <WarningIcon size={20} className="text-[#f59e0b] mt-1" weight="duotone" />
-                    <div>
+                    <div className="w-full">
                       <h3 className="text-sm font-semibold text-[#fafafa] mb-2">Clinical Note</h3>
                       <p className="text-sm text-[#a1a1aa] font-body leading-relaxed">
-                        This AI-assisted diagnosis is for reference only. The Grad-CAM heatmap highlights regions 
-                        that influenced the prediction. Always consult with a qualified radiologist for final diagnosis.
+                        This AI-assisted diagnosis is for reference only. The Grad-CAM heatmap highlights visual regions 
+                        that influenced the prediction, while the SHAP chart quantifies the mathematical impact of the patient's clinical history. Always consult with a qualified radiologist for final diagnosis.
                       </p>
+                      
+                      {result.shap_image && (
+                        <div className="mt-6 pt-4 border-t border-[#27272a]">
+                          <h4 className="text-xs font-semibold text-[#fafafa] mb-3 uppercase tracking-wider font-mono">Clinical Feature Impact (SHAP)</h4>
+                          <img 
+                            src={result.shap_image} 
+                            alt="SHAP Clinical Explainability" 
+                            className="w-full rounded-md border border-[#27272a] bg-white/5"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

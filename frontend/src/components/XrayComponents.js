@@ -41,8 +41,9 @@ export const XrayViewer = ({
 
         {image && (
           <>
+            {/* Show baked Grad-CAM image if available and toggled on, else show original */}
             <img
-              src={image}
+              src={gradCamImage && showGradCam ? gradCamImage : image}
               alt="X-ray"
               className="relative z-0 max-w-full max-h-full object-contain"
               style={{ transform: `scale(${zoom})` }}
@@ -52,19 +53,6 @@ export const XrayViewer = ({
             
             {/* Scanline effect */}
             <div className="absolute inset-0 scanlines pointer-events-none z-20" />
-            
-            {/* Grad-CAM Overlay */}
-            {gradCamImage && showGradCam && (
-              <motion.img
-                initial={{ opacity: 0 }}
-                animate={{ opacity: overlayOpacity }}
-                src={gradCamImage}
-                alt="Grad-CAM"
-                className="absolute inset-0 m-auto max-w-full max-h-full object-contain z-10"
-                style={{ transform: `scale(${zoom})`, mixBlendMode: 'screen' }}
-                data-testid="gradcam-overlay"
-              />
-            )}
             
             {/* Processing Scan Line */}
             {isProcessing && (
@@ -106,15 +94,6 @@ export const XrayViewer = ({
               <div className="w-px h-6 bg-white/10" />
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[#a1a1aa] font-mono">Heatmap</span>
-                <Slider
-                  value={[overlayOpacity]}
-                  onValueChange={(v) => setOverlayOpacity(v[0])}
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  className="w-24"
-                  data-testid="heatmap-opacity-slider"
-                />
                 <Button
                   size="sm"
                   variant={showGradCam ? "default" : "outline"}
@@ -174,7 +153,7 @@ export const ConfidenceGauge = ({ confidence, prediction }) => {
       {/* Percentage */}
       <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-6">
         <span className="text-2xl font-mono font-bold text-[#fafafa]" data-testid="confidence-percentage">
-          {(confidence * 100).toFixed(1)}%
+          {(confidence * 100).toFixed(6)}%
         </span>
       </div>
     </div>
@@ -183,28 +162,33 @@ export const ConfidenceGauge = ({ confidence, prediction }) => {
 
 export const StatusBadge = ({ prediction, confidence }) => {
   const isFracture = prediction === 'Fracture';
+  const riskLabel = isFracture ? 'HIGH RISK' : 'LOW RISK';
+  const riskSub = isFracture ? 'Fracture Detected' : 'No Fracture Detected';
   
   return (
     <div 
       className={cn(
-        "inline-flex items-center gap-2 px-4 py-2 rounded-full border",
+        "inline-flex flex-col items-center gap-1 px-6 py-3 rounded-full border",
         isFracture 
           ? "bg-red-500/10 border-red-500/30 text-red-400" 
           : "bg-green-500/10 border-green-500/30 text-green-400"
       )}
       data-testid="status-badge"
     >
-      <motion.div
-        className={cn(
-          "w-2 h-2 rounded-full",
-          isFracture ? "bg-red-500" : "bg-green-500"
-        )}
-        animate={{ scale: [1, 1.2, 1] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      />
-      <span className="font-mono text-sm font-medium" data-testid="status-text">
-        {prediction}
-      </span>
+      <div className="flex items-center gap-2">
+        <motion.div
+          className={cn(
+            "w-2 h-2 rounded-full",
+            isFracture ? "bg-red-500" : "bg-green-500"
+          )}
+          animate={{ scale: [1, 1.3, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        />
+        <span className="font-mono text-base font-bold tracking-widest" data-testid="status-text">
+          {riskLabel}
+        </span>
+      </div>
+      <span className="text-xs font-mono opacity-70">{riskSub}</span>
     </div>
   );
 };

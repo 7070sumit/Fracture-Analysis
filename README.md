@@ -1,6 +1,6 @@
-# 🦴 BoneFractureAI - End-to-End Bone Fracture Detection System
+# 🦴 BoneFractureAI - Multimodal Bone Fracture Detection System
 
-A **full-stack AI-powered medical imaging system** that detects bone fractures from X-ray images using **Deep Learning (ResNet50 + PyTorch)** and provides **visual explanations via Grad-CAM**.
+A **full-stack AI-powered medical imaging system** that detects bone fractures by combining **Deep Learning (ResNet50)** for X-rays with **Clinical Data MLPs**. It provides dual-explainability using **Grad-CAM (Visual)** and **SHAP (Clinical)**.
 
 ---
 
@@ -8,12 +8,12 @@ A **full-stack AI-powered medical imaging system** that detects bone fractures f
 
 ## 🎯 Objective
 
-Build a **scalable AI system** that:
+Build a **scalable, clinical-grade AI system** that:
 
-* Detects fractures from X-ray images
-* Provides **confidence score**
-* Highlights **important regions (Grad-CAM heatmap)**
-* Stores prediction history
+* Detects fractures using both X-ray images and patient history (Age, BMI, etc.)
+* Provides a highly calibrated **confidence risk score**
+* Highlights **visual regions (Grad-CAM heatmap)**
+* Quantifies **clinical risk factors (SHAP charts)**
 * Allows **model training + retraining**
 
 ---
@@ -22,18 +22,20 @@ Build a **scalable AI system** that:
 
 | Feature                 | Description                                       |
 | ----------------------- | ------------------------------------------------- |
-| **Classification**      | Predicts whether X-ray is `Normal` or `Fractured` |
-| **Confidence Score**    | Probability of prediction                         |
-| **Explainability**      | Uses Grad-CAM to show *why* prediction was made   |
-| **Training Capability** | Train model on custom dataset                     |
-| **Real-time Inference** | Instant prediction via API                        |
+| **Multimodal Analysis** | Analyzes X-ray + Patient Clinical Profile         |
+| **Risk Assessment**     | High precision probability of fracture            |
+| **Dual-Explainability** | Grad-CAM (Where it looked) + SHAP (Why it matters)|
+| **Training Capability** | Train model on custom multimodal datasets         |
+| **Real-time Inference** | Instant prediction via FastAPI                    |
 
 ---
 
 ## 🔬 Model Pipeline (High-Level Flow)
 
 ```
-X-ray Image → Preprocessing → ResNet50 → Prediction → Grad-CAM → Response
+X-Ray Image → ResNet50 \
+                         → Attention Fusion → Prediction → Grad-CAM & SHAP → UI
+Clinical Data → MLP    /
 ```
 
 ---
@@ -43,9 +45,9 @@ X-ray Image → Preprocessing → ResNet50 → Prediction → Grad-CAM → Respo
 ## Backend
 
 * **FastAPI** → API framework
-* **PyTorch** → Deep learning
-* **ResNet50** → Transfer learning model
-* **Grad-CAM** → Model explainability
+* **PyTorch** → Deep learning (ResNet50 + Custom MLP)
+* **Grad-CAM** → Visual model explainability
+* **SHAP** → Clinical model explainability
 * **MongoDB** → Stores predictions
 * **OpenCV + Pillow** → Image processing
 
@@ -95,34 +97,29 @@ bone-fracture-ai/
 * Normalize using ImageNet stats
 * Convert to tensor
 
-## Step 2: Transfer Learning
+## Step 2: Multimodal Fusion
 
-* Load **ResNet50 pretrained on ImageNet**
-* Replace final layer:
-
-```python
-model.fc = nn.Linear(in_features, 2)
-```
+* Load **ResNet50 pretrained on ImageNet** for visual feature extraction (2048 vector).
+* Process **Clinical Data** (Age, BMI, Sex, Diabetes, Falls) via a Multi-Layer Perceptron (64 vector).
+* Fuse them together using a custom **Attention Mechanism**.
 
 ## Step 3: Training
 
 * Loss: **CrossEntropyLoss**
 * Optimizer: **Adam**
-* Metrics: Accuracy, Loss
+* Metrics: ROC-AUC, Accuracy, Loss
 
 ## Step 4: Prediction
 
-* Softmax → Probability
+* Softmax → Risk Probability
 * Class Output:
+  * `0 → Normal (Low Risk)`
+  * `1 → Fractured (High Risk)`
 
-  * `0 → Normal`
-  * `1 → Fractured`
+## Step 5: Dual Explainability
 
-## Step 5: Grad-CAM
-
-* Extract last convolutional layer
-* Compute gradients
-* Generate heatmap overlay
+* **Grad-CAM**: Computes gradients from the last convolutional layer to generate a red heatmap overlay over the fracture site.
+* **SHAP**: Calculates the mathematical contribution of the patient's specific clinical features to generate a feature importance bar chart.
 
 ---
 
@@ -219,31 +216,31 @@ yarn start
 
 # 🔄 7. Running the Application
 
-## Option 1: Two Terminals
+## The Automated Way (Recommended)
 
-Terminal 1:
+We have provided a single shell script that automatically starts the virtual environment, launches the FastAPI backend in the background, and boots up the React frontend.
+
+```bash
+chmod +x start_app.sh
+./start_app.sh
+```
+
+## Option 2: Manual Start (Two Terminals)
+
+Terminal 1 (Backend):
 
 ```bash
 cd backend
 source venv/bin/activate
-uvicorn server:app --reload
+uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
-Terminal 2:
+Terminal 2 (Frontend):
 
 ```bash
 cd frontend
-yarn start
-```
-
----
-
-## Option 2: PM2 (Recommended)
-
-```bash
-npm install -g pm2
-pm2 start ecosystem.config.js
-pm2 logs
+npm install --legacy-peer-deps
+npm start
 ```
 
 ---
