@@ -56,6 +56,7 @@ class PredictionResult(BaseModel):
     confidence: float
     probabilities: List[float]
     grad_cam_image: Optional[str] = None
+    shap_image: Optional[str] = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     filename: str
 
@@ -64,6 +65,7 @@ class PredictionResponse(BaseModel):
     confidence: float
     probabilities: List[float]
     grad_cam_image: Optional[str] = None
+    shap_image: Optional[str] = None
     class_idx: int
 
 class TrainingRequest(BaseModel):
@@ -86,6 +88,10 @@ class ModelMetrics(BaseModel):
     recall: float
     f1_score: float
     confusion_matrix: List[List[int]]
+    roc_auc: Optional[float] = None
+    brier_score: Optional[float] = None
+    roc_curve_image: Optional[str] = None
+    calibration_curve_image: Optional[str] = None
 
 @api_router.get("/")
 async def root():
@@ -110,7 +116,7 @@ async def predict_fracture(file: UploadFile = File(...)):
             buffer.write(content)
         
         # Run inference
-        result = model_manager.predict(temp_path, return_cam=True)
+        result = model_manager.predict(temp_path, return_cam=True, original_filename=file.filename)
         
         # Store prediction in database
         prediction_doc = {
@@ -121,7 +127,10 @@ async def predict_fracture(file: UploadFile = File(...)):
             "filename": file.filename,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        await db.predictions.insert_one(prediction_doc)
+        try:
+            await db.predictions.insert_one(prediction_doc)
+        except Exception as db_err:
+            logging.warning(f"Failed to save prediction to database (ignoring): {str(db_err)}")
         
         return PredictionResponse(**result)
     

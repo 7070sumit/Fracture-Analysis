@@ -1,4 +1,4 @@
-# 🧠 Bone Fracture Detection Model Architecture
+# 🧠 Multimodal Bone Fracture Detection Architecture
 
 ---
 
@@ -12,13 +12,13 @@
 
 # 📌 1. High-Level Overview
 
-The BoneFractureAI system is built using a **Convolutional Neural Network (CNN)** with **Transfer Learning** based on **ResNet50**.
+The BoneFractureAI system is a **Multimodal Fusion Network** that combines a **Convolutional Neural Network (ResNet50)** for X-ray images with a **Multi-Layer Perceptron (MLP)** for patient clinical data (Age, BMI, Medical History).
 
 ### 🎯 Objective
 
-* Detect bone fractures from X-ray images
-* Provide classification: **Normal vs Fractured**
-* Generate **visual explanations using Grad-CAM**
+* Detect bone fractures by analyzing **both** visual X-ray data and clinical risk factors.
+* Provide risk classification: **Normal vs Fractured**
+* Generate **dual-explainability** using **Grad-CAM** (Visual) and **SHAP** (Clinical).
 
 ---
 
@@ -26,19 +26,21 @@ The BoneFractureAI system is built using a **Convolutional Neural Network (CNN)*
 
 | Component             | Description                    |
 | --------------------- | ------------------------------ |
-| **Architecture Type** | CNN with Transfer Learning     |
-| **Base Model**        | ResNet50 (ImageNet Pretrained) |
-| **Task**              | Binary Classification          |
-| **Input Size**        | 224 × 224 × 3                  |
+| **Architecture Type** | Multimodal Attention Fusion    |
+| **Base Models**       | ResNet50 (Visual) + MLP (Text) |
+| **Task**              | Binary Risk Classification     |
+| **Inputs**            | 224×224×3 (Image) + 5 Features |
 | **Output**            | 2 Classes (Normal, Fracture)   |
-| **Explainability**    | Grad-CAM                       |
+| **Explainability**    | Grad-CAM (Image) + SHAP (Text) |
 
 ---
 
 # 🏗️ 2. Complete Model Pipeline
 
 ```text
-Input Image → Preprocessing → ResNet50 → Custom Head → Softmax Output
+Input Image  → Preprocessing → ResNet50 (2048) \
+                                                → Attention Fusion → Classifier → Output
+Clinical Data → Normalization → MLP (64)       /
 ```
 
 ---
@@ -110,43 +112,34 @@ Output = ReLU(F(x) + x)
 
 ---
 
-## 🎯 3.3 Stage 3: Custom Classification Head
+## 🎯 3.3 Stage 3: Clinical MLP & Attention Fusion
 
-### Input
+### Inputs
 
-Feature vector: **2048**
+* Visual Feature Vector (from ResNet50): **2048**
+* Clinical Feature Vector (Age, BMI, Sex, Diabetes, Falls): **5**
 
 ---
 
 ### Layer Breakdown
 
-#### 🔹 Fully Connected Layer
+#### 🔹 Clinical Multi-Layer Perceptron (MLP)
+Maps raw clinical data into a higher-dimensional feature space.
+* 5 → 32 → 64
+* Includes BatchNorm and ReLU activations.
 
-* 2048 → 512
+#### 🔹 Feature Concatenation
+* Visual (2048) + Clinical (64) = **Combined Vector (2112)**
 
+#### 🔹 Attention Mechanism
+Learns which features (visual vs clinical) are most critical for the specific patient.
 ```math
-h1 = W1 · x + b1
+attn_weights = Sigmoid(W_attn · Combined)
+attended_features = Combined ⊙ attn_weights
 ```
 
-#### 🔹 Activation
-
-```math
-h1 = max(0, h1)
-```
-
-#### 🔹 Dropout
-
-```math
-h1 = h1 · mask / 0.5
-```
-
-#### 🔹 Final Layer
-
-* 512 → 2
-
-```math
-logits = W2 · h1 + b2
-```
+#### 🔹 Final Classification Head
+* 2112 → 512 → 256 → 2
 
 ---
 
@@ -158,19 +151,20 @@ P(class) = exp(z) / Σ exp(z)
 
 ---
 
-### 📊 Parameters
+### 📊 Additional Parameters
 
-| Layer          | Parameters |
-| -------------- | ---------- |
-| FC1            | 1,049,088  |
-| FC2            | 1,026      |
-| **Total Head** | ~1.05M     |
+| Layer             | Parameters |
+| ----------------- | ---------- |
+| Clinical MLP      | ~2,300     |
+| Attention Network | ~4.4M      |
+| Classification    | ~1.2M      |
+| **Total Head**    | ~5.6M      |
 
 ---
 
 ### 🔢 Total Model Parameters
 
-👉 **24.5 Million Parameters**
+👉 **~29.1 Million Parameters**
 
 ---
 
@@ -181,9 +175,11 @@ P(class) = exp(z) / Σ exp(z)
 ## 🔁 Forward Pass
 
 ```math
-F = ResNet50(I_norm)
-h1 = ReLU(W1 · F + b1)
-z = W2 · Dropout(h1) + b2
+F_visual = ResNet50(Image_norm)
+F_clinical = MLP(Clinical_norm)
+F_combined = Concat(F_visual, F_clinical)
+F_attended = F_combined ⊙ Sigmoid(W_attn · F_combined)
+z = Classifier(F_attended)
 ŷ = Softmax(z)
 ```
 
@@ -211,32 +207,34 @@ L = -[y log(ŷ1) + (1-y) log(ŷ0)]
 
 ---
 
-# 🎨 5. Grad-CAM (Explainable AI)
+# 🎨 5. Explainable AI (Grad-CAM & SHAP)
 
 ---
 
-## 🎯 Purpose
+## 🎯 5.1 Visual Explainability (Grad-CAM)
 
 To **visualize important regions** in X-ray images.
-
----
-
-## 📐 Mathematical Steps
 
 ```math
 α = avg(∂y / ∂A)
 L = ReLU(Σ αk · Ak)
 ```
 
----
-
-## 🎯 Output Interpretation
-
 | Color     | Meaning         |
 | --------- | --------------- |
 | 🔴 Red    | High importance |
 | 🟡 Yellow | Medium          |
 | 🔵 Blue   | Low             |
+
+---
+
+## 📊 5.2 Clinical Explainability (SHAP)
+
+To quantify the mathematical impact of **patient medical history** on the final risk prediction.
+
+* **SHAP Values (Shapley Additive exPlanations)** break down the MLP's contribution.
+* **Positive values (Red Bars)**: Factors (e.g., history of falls) that actively increased the fracture probability.
+* **Negative values (Blue Bars)**: Protective factors that decreased fracture probability.
 
 ---
 
@@ -299,30 +297,45 @@ L = ReLU(Σ αk · Ak)
 # 💻 9. Code Implementation
 
 ```python
-class BoneFractureModel(nn.Module):
+class MultimodalFractureModel(nn.Module):
     def __init__(self):
         super().__init__()
+        # Visual
         self.backbone = models.resnet50(pretrained=True)
-
-        self.backbone.fc = nn.Sequential(
-            nn.Linear(2048, 512),
-            nn.ReLU(),
-            nn.Dropout(0.5),
+        self.backbone.fc = nn.Identity()
+        
+        # Clinical
+        self.clinical_mlp = nn.Sequential(
+            nn.Linear(5, 32), nn.ReLU(),
+            nn.Linear(32, 64), nn.ReLU()
+        )
+        
+        # Fusion
+        self.attention = nn.Sequential(
+            nn.Linear(2112, 2112), nn.Sigmoid()
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(2112, 512), nn.ReLU(),
             nn.Linear(512, 2)
         )
 
-    def forward(self, x):
-        return self.backbone(x)
+    def forward(self, img, clinical):
+        img_features = self.backbone(img)
+        clin_features = self.clinical_mlp(clinical)
+        
+        combined = torch.cat((img_features, clin_features), dim=1)
+        attended = combined * self.attention(combined)
+        return self.classifier(attended)
 ```
 
 ---
 
 # 🎓 10. Final Summary
 
-* Model: **ResNet50 + Custom Head**
-* Parameters: **~24.5M**
-* Task: **Binary Classification**
-* Key Feature: **Explainable AI (Grad-CAM)**
+* Model: **Multimodal Fusion (ResNet50 + MLP)**
+* Parameters: **~29.1M**
+* Task: **Multimodal Risk Prediction**
+* Key Feature: **Dual-Explainability (Grad-CAM & SHAP)**
 
 ---
 
@@ -330,10 +343,10 @@ class BoneFractureModel(nn.Module):
 
 This architecture provides:
 
-* High accuracy
-* Interpretability
-* Scalability
+* **Robustness**: Combines visual imaging with hard clinical data.
+* **Deep Interpretability**: Clinicians can see *where* the AI looked (Grad-CAM) and *why* the patient history matters (SHAP).
+* **High Clinical Utility**: Mirrors real-world radiological workflows.
 
-👉 Ideal for **AI-powered medical diagnosis systems**
+👉 Ideal for **next-generation Clinical Decision Support Systems (CDSS)**
 
 ---
